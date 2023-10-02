@@ -1,0 +1,118 @@
+version: '3'
+services:
+
+
+  cache:
+    image: redis:6
+    networks:
+      - virtual_private_network
+
+
+  database:
+    image: postgis/postgis:13-master
+
+    volumes:
+      - ./database:/var/lib/postgresql/data
+
+    environment:
+      POSTGRES_USER: 'directus'
+      POSTGRES_PASSWORD: 'directus'
+      POSTGRES_DB: 'directus'
+
+    ports:
+      - '5432'
+
+    networks:
+      - virtual_private_network
+
+  directus:
+    image: directus/directus:latest
+
+    ports:
+      - "8055"
+
+    volumes:
+      - ./directus/database:/directus/database
+      - ./directus/uploads:/directus/uploads
+      - ./directus/extensions:/directus/extensions
+
+    depends_on:
+      - cache
+      - database
+
+    environment:
+      KEY: '255d861b-5ea1-5996-9aa3-922530ec40b1'
+      SECRET: '6116487b-cda1-52c2-b5b5-c8022c45e263'
+
+      DB_CLIENT: 'pg'
+      DB_HOST: 'database'
+      DB_PORT: '5432'
+      DB_DATABASE: 'directus'
+      DB_USER: 'directus'
+      DB_PASSWORD: 'directus'
+
+      CACHE_ENABLED: 'true'
+      CACHE_STORE: 'redis'
+      REDIS: 'redis://cache:6379'
+
+    networks:
+      - virtual_private_network
+
+  backend:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile.prod
+
+    depends_on:
+      - cache
+      - database
+      - directus
+
+    environment:
+      NODE_ENV: 'production'
+      DIRECTUS_HOST: 'directus'
+      DIRECTUS_PORT: '8055'
+      DIRECTUS_USER: 'admin@example.com'
+      DIRECTUS_PASSWORD: 'password'
+
+      CACHE_ENABLED: 'true'
+      CACHE_STORE: 'redis'
+      REDIS: 'redis://cache:6379'
+
+    ports:
+      - '3000:3000'
+
+    networks:
+      - virtual_private_network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./frontend/Dockerfile.prod
+
+    depends_on:
+      - cache
+      - database
+      - directus
+      - backend
+
+    environment:
+      NODE_ENV: 'production'
+      DIRECTUS_HOST: 'directus'
+      DIRECTUS_PORT: '8055'
+      DIRECTUS_USER: 'admin@example.com'
+      DIRECTUS_PASSWORD: 'password'
+
+      CACHE_ENABLED: 'true'
+      CACHE_STORE: 'redis'
+      REDIS: 'redis://cache:6379'
+
+    ports:
+      - '3000:3000'
+
+    networks:
+      - virtual_private_network
+
+
+networks:
+  virtual_private_network:
